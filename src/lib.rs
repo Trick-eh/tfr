@@ -1,8 +1,11 @@
 pub mod persistence;
 pub mod ui_additions;
 
-use docx_rs::*;
 use std::{fs, path::Path};
+
+use docx_rs::{
+    DocumentChild, Paragraph, ParagraphChild, RunChild, TableCellContent, TableChild, TableRowChild,
+};
 
 pub fn extract_text<P: AsRef<Path>>(path: P) -> Result<String, Box<dyn std::error::Error>> {
     let path = path.as_ref();
@@ -14,7 +17,8 @@ pub fn extract_text<P: AsRef<Path>>(path: P) -> Result<String, Box<dyn std::erro
 
     match ext.as_str() {
         "txt" => Ok(fs::read_to_string(path)?),
-        "pdf" => Ok(pdf_extract::extract_text(path)?),
+        "md" | "markdown" => extract_markdown(path),
+        "pdf" => extract_pdf(path),
         "docx" => {
             let bytes = fs::read(path)?;
             let docx = docx_rs::read_docx(&bytes)?;
@@ -76,4 +80,54 @@ fn extract_docx_paragraph_text(p: &Paragraph, out: &mut String) {
             }
         }
     }
+}
+
+fn extract_markdown(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
+    let raw_md = fs::read_to_string(path)?;
+    let mut clean_text = String::with_capacity(raw_md.len());
+
+    for line in raw_md.lines() {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("```") || trimmed.starts_with("---") || trimmed.starts_with("![") {
+            continue;
+        }
+
+        let line_without_prefix = trimmed
+            .trim_start_matches('#')
+            .trim_start_matches(['*', '-', '+'])
+            .trim();
+
+        let mut in_code = false;
+        let mut chars = line_without_prefix.chars().peekable();
+
+        while let Some(ch) = chars.next() {
+            match ch {
+                '`' => in_code = !in_code,
+                '*' | '_' => continue,
+                '[' => continue,
+                ']' => {
+                    if chars.peek() == Some(&'(') {
+                        chars.next();
+                        while let Some(&inner) = chars.peek() {
+                            chars.next();
+                            if inner == ')' {
+                                break;
+                            }
+                        }
+                    }
+                }
+                _ => clean_text.push(ch),
+            }
+        }
+        clean_text.push(' ');
+    }
+
+    Ok(clean_text)
+}
+
+fn extract_pdf(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
+    let text = pdf_extract::extract_text(path)?;
+
+    Ok(text)
 }

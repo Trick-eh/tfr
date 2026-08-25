@@ -1,4 +1,6 @@
-use eframe::egui::{self, Color32, FontId, Pos2};
+#![windows_subsystem = "windows"]
+
+use eframe::egui::{self, FontId, Pos2};
 use std::{
     path::PathBuf,
     time::{Duration, Instant},
@@ -10,10 +12,14 @@ use tfr::{
 };
 
 fn main() -> Result<(), eframe::Error> {
+    let icon = load_custom_icon();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([800.0, 500.0])
-            .with_active(true),
+            .with_active(true)
+            .with_decorations(false)
+            .with_icon(icon),
+
         ..Default::default()
     };
 
@@ -22,6 +28,25 @@ fn main() -> Result<(), eframe::Error> {
         options,
         Box::new(|_| Box::new(RsvpApp::default())),
     )
+}
+
+fn load_custom_icon() -> egui::IconData {
+    let width = 32;
+    let height = 32;
+    let mut rgba = Vec::with_capacity((width * height * 4) as usize);
+
+    for _ in 0..(width * height) {
+        rgba.push(255);
+        rgba.push(140);
+        rgba.push(0);
+        rgba.push(255);
+    }
+
+    egui::IconData {
+        rgba,
+        width,
+        height,
+    }
 }
 
 struct RsvpApp {
@@ -66,7 +91,7 @@ impl Default for RsvpApp {
             is_playing: false,
             last_tick: Instant::now(),
 
-            theme: ThemePreset::OledBlack,
+            theme: saved.last_theme,
             font_size: 54.0,
             last_mouse_move: Instant::now(),
             mouse_pos_cache: None,
@@ -79,6 +104,7 @@ impl RsvpApp {
             last_file_path: self.current_path.clone(),
             current_index: self.current_index,
             wpm: self.wpm,
+            last_theme: self.theme,
         };
         state.save();
     }
@@ -92,7 +118,10 @@ impl RsvpApp {
     }
     fn load_file(&mut self) {
         if let Some(path) = rfd::FileDialog::new()
-            .add_filter("Documents", &["txt", "pdf", "docx", "epub"])
+            .add_filter(
+                "Documents",
+                &["txt", "md", "markdown", "pdf", "docx", "epub"],
+            )
             .pick_file()
             && let Ok(text) = extract_text(&path)
         {
@@ -234,9 +263,14 @@ impl eframe::App for RsvpApp {
                         ui.add(egui::Slider::new(&mut self.font_size, 32.0..=96.0).suffix("px"));
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.radio_value(&mut self.theme, ThemePreset::WarmSepia, "Sepia");
-                            ui.radio_value(&mut self.theme, ThemePreset::DeepAmber, "Amber");
-                            ui.radio_value(&mut self.theme, ThemePreset::OledBlack, "OLED");
+                            ui.menu_button("Theme", |ui| {
+                                ui.spacing_mut().menu_margin = egui::Margin::symmetric(0.0, 0.0);
+                                ui.set_max_width(60.0);
+                                ui.set_min_width(0.0);
+                                ui.radio_value(&mut self.theme, ThemePreset::WarmSepia, "Sepia");
+                                ui.radio_value(&mut self.theme, ThemePreset::DeepAmber, "Amber");
+                                ui.radio_value(&mut self.theme, ThemePreset::OledBlack, "OLED");
+                            });
                         });
                     });
                 });
@@ -358,19 +392,31 @@ impl eframe::App for RsvpApp {
                     let anchor_width = anchor_galley.rect.width();
 
                     let tick_color = self.theme.text_color().linear_multiply(0.2);
+
+                    let line_height = anchor_galley.rect.height();
+                    let tick_length = (self.font_size * 0.25).max(6.0);
+                    let gap = 6.0;
+                    let stroke_width = (self.font_size * 0.04).clamp(1.5, 3.5);
+
+                    let top_tick_bottom = center_y - (line_height / 2.0) - gap;
+                    let top_tick_top = top_tick_bottom - tick_length;
+
+                    let bottom_tick_top = center_y + (line_height / 2.0) + gap;
+                    let bottom_tick_bottom = bottom_tick_top + tick_length;
+
                     painter.line_segment(
                         [
-                            Pos2::new(center_x, center_y - 45.0),
-                            Pos2::new(center_x, center_y - 32.0),
+                            Pos2::new(center_x, top_tick_top),
+                            Pos2::new(center_x, top_tick_bottom),
                         ],
-                        (2.0, tick_color),
+                        (stroke_width, tick_color),
                     );
                     painter.line_segment(
                         [
-                            Pos2::new(center_x, center_y + 32.0),
-                            Pos2::new(center_x, center_y + 45.0),
+                            Pos2::new(center_x, bottom_tick_top),
+                            Pos2::new(center_x, bottom_tick_bottom),
                         ],
-                        (2.0, tick_color),
+                        (stroke_width, tick_color),
                     );
 
                     let anchor_pos = Pos2::new(

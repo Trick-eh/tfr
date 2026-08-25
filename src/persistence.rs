@@ -1,11 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
+use crate::ui_additions::ThemePreset;
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SavedState {
     pub last_file_path: Option<PathBuf>,
     pub current_index: usize,
     pub wpm: u32,
+    pub last_theme: ThemePreset,
 }
 
 impl SavedState {
@@ -29,6 +32,7 @@ impl SavedState {
             last_file_path: None,
             current_index: 0,
             wpm: 300,
+            last_theme: ThemePreset::OledBlack,
         }
     }
     pub fn save(&self) {

@@ -1,4 +1,4 @@
-use eframe::egui::{Color32, FontId, Pos2, Rect, Response, Sense, Stroke, Ui, Vec2};
+use eframe::egui::{Color32, Pos2, Rect, Response, Sense, Stroke, Ui, Vec2};
 use serde::{Deserialize, Serialize};
 
 pub fn segmented_progress_bar(
@@ -44,7 +44,7 @@ pub fn segmented_progress_bar(
     response
 }
 
-#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize, Debug)]
 pub enum ThemePreset {
     OledBlack,
     DeepAmber,
